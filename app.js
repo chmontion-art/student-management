@@ -3,7 +3,6 @@ const mysql = require('mysql2');
 
 const app = express();
 
-// MySQL connection
 const db = mysql.createConnection({
     host: 'localhost',
     user: 'root',
@@ -17,20 +16,15 @@ db.connect((err) => {
         return;
     }
 
-    console.log('Connected to MySQL database');
+    console.log('Connected to MySQL');
 });
 
-// EJS setup
 app.set('view engine', 'ejs');
 
-// Middleware
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(express.static('public'));
 
-// ===============================
-// STUDENT LIST
-// ===============================
-
+// Student List
 app.get('/', (req, res) => {
     db.query(
         'SELECT * FROM students ORDER BY id DESC',
@@ -47,18 +41,13 @@ app.get('/', (req, res) => {
     );
 });
 
-// ===============================
-// ADD STUDENT
-// ===============================
-
-// Show add student form
+// Add Student Page
 app.get('/students/add', (req, res) => {
     res.render('add');
 });
 
-// Add student
+// Add Student
 app.post('/students/add', (req, res) => {
-
     const {
         student_id,
         first_name,
@@ -74,110 +63,60 @@ app.post('/students/add', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?)
     `;
 
-    db.query(
-        sql,
-        [
-            student_id,
-            first_name,
-            last_name,
-            course,
-            year_level,
-            email
-        ],
-        (err) => {
-
-            if (err) {
-                console.error(err);
-                return res.status(500).send('Error adding student');
-            }
-
-            res.redirect('/');
-        }
-    );
-});
-
-// ===============================
-// EDIT STUDENT
-// ===============================
-
-// Show edit student form
-app.get('/students/edit/:id', (req, res) => {
-
-    const id = req.params.id;
-
-    db.query(
-        'SELECT * FROM students WHERE id = ?',
-        [id],
-        (err, results) => {
-
-            if (err) {
-                console.error(err);
-                return res.status(500).send('Database error');
-            }
-
-            if (results.length === 0) {
-                return res.status(404).send('Student not found');
-            }
-
-            res.render('edit', {
-                student: results[0]
-            });
-        }
-    );
-});
-
-// Update student
-app.post('/students/edit/:id', (req, res) => {
-
-    const id = req.params.id;
-
-    const {
+    const values = [
         student_id,
         first_name,
         last_name,
         course,
         year_level,
         email
-    } = req.body;
+    ];
+
+    db.query(sql, values, (err) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).send('Unable to save student');
+        }
+
+        res.redirect('/');
+    });
+});
+
+// Search Student
+app.get('/students/search', (req, res) => {
+    const keyword = req.query.keyword || '';
 
     const sql = `
-        UPDATE students
-        SET student_id = ?,
-            first_name = ?,
-            last_name = ?,
-            course = ?,
-            year_level = ?,
-            email = ?
-        WHERE id = ?
+        SELECT * FROM students
+        WHERE student_id LIKE ?
+        OR first_name LIKE ?
+        OR last_name LIKE ?
+        OR course LIKE ?
     `;
+
+    const searchValue = `%${keyword}%`;
 
     db.query(
         sql,
         [
-            student_id,
-            first_name,
-            last_name,
-            course,
-            year_level,
-            email,
-            id
+            searchValue,
+            searchValue,
+            searchValue,
+            searchValue
         ],
-        (err) => {
-
+        (err, results) => {
             if (err) {
                 console.error(err);
-                return res.status(500).send('Error updating student');
+                return res.status(500).send('Search error');
             }
 
-            res.redirect('/');
+            res.render('index', {
+                students: results
+            });
         }
     );
 });
 
-// ===============================
-// START SERVER
-// ===============================
-
 app.listen(3000, () => {
-    console.log('Server running on http://localhost:3000');
+    console.log('Server running at http://localhost:3000');
 });
